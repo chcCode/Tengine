@@ -1,25 +1,76 @@
+# =============================================================================
+# TEngine 仓库根目录 .gitignore
+# Unity 工程在 UnityProject/ 子目录，构建产物以 UnityProject/.gitignore 为准
+# =============================================================================
 
-UnityProject/UserSettings/Layouts/default-2021.dwlt
-UnityProject/UserSettings/Search.settings
+# -----------------------------------------------------------------------------
+# 误在仓库根目录生成的 Unity 目录（请勿在根目录打开 Unity 工程）
+# -----------------------------------------------------------------------------
+/Library/
+/Logs/
+/Packages/
+/ProjectSettings/
+/UserSettings/
+/Temp/
+/Assets/
 
-#Luban
+# -----------------------------------------------------------------------------
+# Luban 配置与生成物
+# -----------------------------------------------------------------------------
 Tools/Luban/
 Tools/Luban.ClientServer/
 Configs/.cache.meta
 GenerateDatas/
 
-#FileServer
+# -----------------------------------------------------------------------------
+# 本地文件服务器资源目录
+# -----------------------------------------------------------------------------
 Tools/FileServer/AssetRoot
 
+# -----------------------------------------------------------------------------
+# GameEventSourceGenerator 编译产物
+# -----------------------------------------------------------------------------
+Tools/GameEventSourceGenerator/.idea
+Tools/GameEventSourceGenerator/GameEventAnalyzer/bin/
+Tools/GameEventSourceGenerator/GameEventAnalyzer/obj/
+Tools/GameEventSourceGenerator/SourceGenerator/bin/
+Tools/GameEventSourceGenerator/SourceGenerator/obj/
+
+# -----------------------------------------------------------------------------
+# UnityProject 用户本地设置（部分文件可提交，见 UnityProject/.gitignore）
+# -----------------------------------------------------------------------------
+UnityProject/UserSettings/Layouts/
+UnityProject/UserSettings/Search.settings
+UnityProject/UserSettings/Search.index
+
+# -----------------------------------------------------------------------------
+# UnityProject Burst / 本地构建配置（机器相关）
+# -----------------------------------------------------------------------------
 UnityProject/ProjectSettings/CommonBurstAotSettings.json
 UnityProject/ProjectSettings/BurstAotSettings_StandaloneWindows.json
 
-#GameEventSourceGenerator
-Tools/GameEventSourceGenerator/.idea
-Tools/GameEventSourceGenerator/GameEventAnalyzer/bin
-Tools/GameEventSourceGenerator/GameEventAnalyzer/obj
-Tools/GameEventSourceGenerator/SourceGenerator/bin
-Tools/GameEventSourceGenerator/SourceGenerator/obj
+# -----------------------------------------------------------------------------
+# IDE / 编辑器
+# -----------------------------------------------------------------------------
+UnityProject/.vscode/
+.idea/
 
-#openspec
+# -----------------------------------------------------------------------------
+# 构建产物（Player 输出，任意层级 bin 目录）
+# -----------------------------------------------------------------------------
+UnityProject/bin/
+
+# -----------------------------------------------------------------------------
+# 临时 / 备份 / 误操作文件
+# -----------------------------------------------------------------------------
+* copy.json
+* copy.json.meta
+* copy.cs
+* copy.cs.meta
+*-copy.cs
+*-copy.cs.meta
+
+# -----------------------------------------------------------------------------
+# OpenSpec 实验目录（本地工作流，不纳入版本库）
+# -----------------------------------------------------------------------------
 openspec/
