@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Reflection;
+using GameConfig;
 using GameLogic;
 #if ENABLE_OBFUZ
 using Obfuz;
@@ -35,8 +36,25 @@ public partial class GameApp
     
     private static void StartGameLogic()
     {
-        // GameEvent.Get<ILoginUI>().ShowLoginUI();
+        LogLubanItemExample();
         GameModule.UI.ShowUIAsync<BattleMainUI>();
+        GameModule.UI.ShowUIAsync<LoginUI>();
+    }
+
+    private static void LogLubanItemExample()
+    {
+        var potion = ItemConfigMgr.Instance.GetItem(1001);
+        if (potion == null)
+        {
+            Log.Warning("Luban 示例：道具 1001 未找到，请先运行 TEngine/Luban/转表");
+            return;
+        }
+
+        Log.Info("Luban 示例：{0} type={1} quality={2} price={3}",
+            potion.Name, potion.Type, potion.Quality, potion.SellPrice);
+
+        var weapons = ItemConfigMgr.Instance.GetItemsByType(EItemType.Weapon);
+        Log.Info("Luban 示例：武器数量={0}", weapons.Count);
     }
     
     private static void Release()

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<module name="">
+    <enum name="EItemType" comment="物品类型">
+        <var name="Weapon" value="0" alias="武器"/>
+        <var name="Armor" value="1" alias="护甲"/>
+        <var name="Consumable" value="2" alias="消耗品"/>
+        <var name="Material" value="3" alias="材料"/>
+    </enum>
+    <enum name="EQuality" comment="品质">
+        <var name="White" value="0" alias="白"/>
+        <var name="Green" value="1" alias="绿"/>
+        <var name="Blue" value="2" alias="蓝"/>
+        <var name="Purple" value="3" alias="紫"/>
+    </enum>
+</module>

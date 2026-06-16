@@ -1,3 +1,4 @@
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -9,12 +10,19 @@ namespace TEngine.Editor
         private static void ZhuanXiaoYi()
         {
 #if UNITY_EDITOR_OSX || UNITY_EDITOR_LINUX
-            string path = Application.dataPath + "/../../Configs/GameConfig/gen_code_bin_to_project_lazyload.sh";
-#elif UNITY_EDITOR_WIN
-            string path = Application.dataPath + "/../../Configs/GameConfig/gen_code_bin_to_project_lazyload.bat";
+            string scriptPath = Path.GetFullPath(Path.Combine(Application.dataPath, "../../Configs/GameConfig/gen_code_bin_to_project_lazyload.sh"));
+            string workDir = Path.GetDirectoryName(scriptPath);
+            Debug.Log($"执行转表：{scriptPath}");
+            ShellHelper.Run($"bash \"{scriptPath}\"", workDir);
+#else
+            string batPath = Path.GetFullPath(Path.Combine(Application.dataPath, "../../Configs/GameConfig/gen_code_bin_to_project_lazyload.bat"));
+            string workDir = Path.GetDirectoryName(batPath);
+            Debug.Log($"执行转表：{batPath}");
+            // AI_MODE=1 跳过 bat 末尾 pause；call 确保子脚本结束后返回
+            ShellHelper.Run($"set AI_MODE=1&& call \"{batPath}\"", workDir);
 #endif
-            Debug.Log($"执行转表：{path}");
-            ShellHelper.RunByPath(path);
+            AssetDatabase.Refresh();
+            Debug.Log("Luban 转表命令已执行完毕，请查看上方日志确认是否成功（应出现 bye~）。");
         }
     }
 }
