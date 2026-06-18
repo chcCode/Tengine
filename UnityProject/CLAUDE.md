@@ -88,6 +88,7 @@ TEngine 基于 HybridCLR + YooAsset + UniTask + Luban 构建。
 |-----|------|------|
 | architecture.md | 项目结构/启动流程 | 核心 |
 | modules.md | 模块 API（Timer/Scene/Audio/Fsm）| 核心 |
+| network-module.md | 网络模块（HTTP/JSON/下载）| 核心 |
 | ui-lifecycle.md | UI 开发（生命周期/层级/属性）| 核心 |
 | event-system.md | 事件系统（两种模式/核心接口）| 核心 |
 | resource-api.md | 资源加载/卸载 | 核心 |

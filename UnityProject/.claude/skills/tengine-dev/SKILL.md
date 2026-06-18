@@ -26,6 +26,7 @@ TEngine 是基于 HybridCLR + YooAsset + UniTask + Luban 的 Unity 游戏框架�
 | 事件系统 | [event-system.md](references/event-system.md) | [event-antipatterns.md](references/event-antipatterns.md) | P0 |
 | 资源加载 | [resource-api.md](references/resource-api.md) | [resource-patterns.md](references/resource-patterns.md) | P0 |
 | 模块使用 | [modules.md](references/modules.md) | — | P0 |
+| 网络请求 | [network-module.md](references/network-module.md) | — | P0 |
 | 热更代码 | [hotfix-workflow.md](references/hotfix-workflow.md) | — | P1 |
 | 代码规范 | [naming-rules.md](references/naming-rules.md) | — | P1 |
 | Luban 配置 | [luban-config.md](references/luban-config.md) | — | P1 |

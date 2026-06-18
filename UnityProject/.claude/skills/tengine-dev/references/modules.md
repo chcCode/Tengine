@@ -17,6 +17,7 @@ GameModule.UI            // UIModule            — UI 管理
 GameModule.Scene         // ISceneModule        — 场景
 GameModule.Timer         // ITimerModule        — 计时器
 GameModule.Localization  // ILocalizationModule — 本地化
+GameModule.Network       // INetworkModule        — HTTP 网络
 
 GameModule.Shutdown()   // 清空所有模块缓存引用，仅在游戏退出时调用
 ```
@@ -122,6 +123,26 @@ var info = MemoryPool.Acquire<DamageInfo>();
 info.Damage = 100;
 MemoryPool.Release(info);  // Release 后禁止再访问，禁止 Release 两次
 ```
+
+### NetworkModule 网络
+
+```csharp
+// 配置
+GameModule.Network.BaseUrl = "http://127.0.0.1:8080";
+GameModule.Network.AuthToken = "token";
+
+// GET / POST JSON
+NetworkResponse resp = await GameModule.Network.GetAsync("/api/user");
+NetworkResponse<LoginResult> login = await GameModule.Network
+    .PostJsonAsync<LoginReq, LoginResult>("/api/login", req);
+
+if (resp.IsSuccess) { Log.Info(resp.Text); }
+
+// 取消
+GameModule.Network.CancelAllRequests();
+```
+
+> 完整 API 见 [network-module.md](network-module.md)。
 
 ### Log 日志系统
 
