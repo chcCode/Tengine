@@ -30,6 +30,11 @@ namespace TEngine
         // 热更DLL设置
         public bool BuildHotFixDll = true;
 
+        // 微信小游戏设置
+        public bool IsWechatMiniGame;
+        public bool ExportWechatMiniGame = true;
+        public bool WechatSdkBuildWebGL = true;
+
         // 打包Player设置
         public bool BuildPlayer;
         public BuildTarget PlayerPlatform;
@@ -66,6 +71,11 @@ namespace TEngine
                 BuildTarget.WebGL => basePath + "WebGL",
                 _ => basePath + target + "/Release"
             };
+        }
+
+        public static string GetDefaultWechatMiniGameOutputPath()
+        {
+            return Application.dataPath + "/../Build/WeChatMiniGame/webgl";
         }
 
         public static BuildTargetGroup GetBuildTargetGroup(BuildTarget target)

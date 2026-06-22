@@ -17,6 +17,7 @@ namespace TEngine
             "Android",
             "iOS",
             "WebGL",
+            "微信小游戏",
         };
 
         private static readonly BuildTarget[] PlatformTargets = new BuildTarget[]
@@ -27,7 +28,10 @@ namespace TEngine
             BuildTarget.Android,
             BuildTarget.iOS,
             BuildTarget.WebGL,
+            BuildTarget.WebGL,
         };
+
+        private const int WechatMiniGamePlatformIndex = 6;
 
         private static readonly string[] PipelineNames = new string[]
         {
@@ -74,6 +78,7 @@ namespace TEngine
         private bool _showMinimalPackageSettings = true;
         private bool _showAdvancedSettings;
         private bool _showDllSettings = true;
+        private bool _showWechatSettings = true;
         private bool _showPlayerSettings;
         private bool _showBuildLog;
         private int _platformIndex;
@@ -82,6 +87,9 @@ namespace TEngine
         // 构建日志
         private List<string> _buildLogs = new List<string>();
         private Vector2 _logScrollPosition;
+
+        // 延迟构建任务（避免在 OnGUI 中同步执行 BuildPlayer 导致布局栈错乱）
+        private Action _pendingBuildAction;
 
         [MenuItem("TEngine/Build/打包工具窗口", false, 0)]
         public static void ShowWindow()
@@ -96,6 +104,27 @@ namespace TEngine
             LoadSettings();
         }
 
+        /// <summary>
+        /// 将构建任务推迟到 OnGUI 之外执行，避免 EndLayoutGroup 报错。
+        /// </summary>
+        private void ScheduleBuild(Action buildAction)
+        {
+            _pendingBuildAction = buildAction;
+            EditorApplication.delayCall += ProcessPendingBuild;
+        }
+
+        private void ProcessPendingBuild()
+        {
+            if (_pendingBuildAction == null)
+            {
+                return;
+            }
+
+            var action = _pendingBuildAction;
+            _pendingBuildAction = null;
+            action.Invoke();
+        }
+
         private void OnGUI()
         {
             if (_config == null)
@@ -108,6 +137,7 @@ namespace TEngine
                 DrawMinimalPackageSettings();
                 DrawAdvancedSettings();
                 DrawDllSettings();
+                DrawWechatSettings();
                 DrawPlayerSettings();
                 DrawActionButtons();
                 DrawBuildLog();
@@ -170,7 +200,9 @@ namespace TEngine
                 EditorGUILayout.BeginVertical("HelpBox");
                 {
                     // 目标平台
+                    int previousPlatformIndex = _platformIndex;
                     _platformIndex = EditorGUILayout.Popup("目标平台", _platformIndex, PlatformNames);
+                    SyncPlatformSelection(previousPlatformIndex);
                     _config.BuildTarget = PlatformTargets[_platformIndex];
 
                     EditorGUILayout.Space(3);
@@ -335,6 +367,77 @@ namespace TEngine
 
         #endregion
 
+        #region 微信小游戏设置
+
+        private void DrawWechatSettings()
+        {
+            if (!IsWechatMiniGamePlatform())
+            {
+                return;
+            }
+
+            _showWechatSettings = EditorGUILayout.BeginFoldoutHeaderGroup(_showWechatSettings,
+                new GUIContent("微信小游戏设置", "WEIXINMINIGAME 宏、SDK 导出与 WebGL 推荐配置"));
+
+            if (_showWechatSettings)
+            {
+                EditorGUILayout.BeginVertical("HelpBox");
+                {
+                    bool sdkInstalled = WechatMiniGameBuildHelper.IsSdkInstalled();
+                    bool defineEnabled = WechatMiniGameBuildHelper.IsDefineSymbolEnabled();
+
+                    EditorGUILayout.LabelField("SDK 状态", sdkInstalled ? "已安装" : "未安装");
+                    EditorGUILayout.LabelField("WEIXINMINIGAME 宏", defineEnabled ? "已启用" : "未启用");
+
+                    EditorGUILayout.Space(3);
+
+                    _config.ExportWechatMiniGame = EditorGUILayout.ToggleLeft(
+                        new GUIContent("构建后导出微信小游戏", "需安装微信转换 SDK，构建完成后自动调用 DoExport"),
+                        _config.ExportWechatMiniGame);
+
+                    if (_config.ExportWechatMiniGame)
+                    {
+                        _config.WechatSdkBuildWebGL = EditorGUILayout.ToggleLeft(
+                            new GUIContent("由微信 SDK 构建 WebGL", "关闭则先由 TEngine 构建 WebGL，再由 SDK 仅做转换"),
+                            _config.WechatSdkBuildWebGL);
+                    }
+
+                    EditorGUILayout.Space(3);
+
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button("启用宏"))
+                    {
+                        WechatMiniGameBuildHelper.SetDefineSymbol(true);
+                    }
+
+                    if (GUILayout.Button("应用推荐 WebGL 设置"))
+                    {
+                        WechatMiniGameBuildHelper.ApplyRecommendedWebGLSettings();
+                    }
+
+                    if (GUILayout.Button("SDK 安装说明"))
+                    {
+                        WechatMiniGameBuildHelper.OpenSdkInstallGuide();
+                    }
+                    EditorGUILayout.EndHorizontal();
+
+                    string helpMessage = sdkInstalled
+                        ? "微信小游戏基于 WebGL 构建。资源模块在 WEIXINMINIGAME 宏下自动使用 WechatFileSystem。\n" +
+                          "建议在 UpdateSetting 中配置 CDN 地址，并将 playMode 设为 WebPlayMode。"
+                        : "未检测到微信转换 SDK。可先完成 AB + WebGL 构建，安装 SDK 后通过菜单「微信小游戏 → 转换小游戏」导出。\n" +
+                          $"安装地址：{WechatMiniGameBuildHelper.SdkGitUrl}";
+
+                    EditorGUILayout.HelpBox(helpMessage, sdkInstalled ? MessageType.Info : MessageType.Warning);
+                }
+                EditorGUILayout.EndVertical();
+            }
+
+            EditorGUILayout.EndFoldoutHeaderGroup();
+            GUILayout.Space(5);
+        }
+
+        #endregion
+
         #region 打包Player设置
 
         private void DrawPlayerSettings()
@@ -355,6 +458,7 @@ namespace TEngine
                         EditorGUILayout.Space(3);
 
                         _playerPlatformIndex = EditorGUILayout.Popup("Player平台", _playerPlatformIndex, PlatformNames);
+                        SyncPlayerPlatformSelection();
                         _config.PlayerPlatform = PlatformTargets[_playerPlatformIndex];
 
                         EditorGUILayout.BeginHorizontal();
@@ -399,13 +503,15 @@ namespace TEngine
                 if (GUILayout.Button("构建 AssetBundle", abStyle, GUILayout.Height(35)))
                 {
                     SaveSettings();
-                    ExecuteBuild(buildPlayer: false);
+                    ScheduleBuild(() => ExecuteBuild(buildPlayer: false));
+                    GUIUtility.ExitGUI();
                 }
 
                 if (GUILayout.Button("构建 Player", abStyle, GUILayout.Height(35)))
                 {
                     SaveSettings();
-                    ExecuteBuildPlayerOnly();
+                    ScheduleBuild(ExecuteBuildPlayerOnly);
+                    GUIUtility.ExitGUI();
                 }
             }
             EditorGUILayout.EndHorizontal();
@@ -422,7 +528,8 @@ namespace TEngine
             {
                 SaveSettings();
                 _config.BuildPlayer = true;
-                ExecuteBuild(buildPlayer: true);
+                ScheduleBuild(() => ExecuteBuild(buildPlayer: true));
+                GUIUtility.ExitGUI();
             }
 
             GUILayout.Space(5);
@@ -573,9 +680,14 @@ namespace TEngine
             _config = new BuildConfig();
 
             _platformIndex = EditorPrefs.GetInt("TEngine_BP_BuildTarget", -1);
-            if (_platformIndex < 0 || _platformIndex >= PlatformTargets.Length)
+            if (_platformIndex < 0 || _platformIndex >= PlatformNames.Length)
             {
                 _platformIndex = GetActivePlatformIndex();
+            }
+
+            if (EditorPrefs.GetBool("TEngine_BP_IsWechatMiniGame", false))
+            {
+                _platformIndex = WechatMiniGamePlatformIndex;
             }
             _config.BuildTarget = PlatformTargets[_platformIndex];
 
@@ -595,15 +707,32 @@ namespace TEngine
             _config.UseAssetDependencyDB = EditorPrefs.GetBool("TEngine_BP_UseDepDB", true);
             _config.ClearBuildCache = EditorPrefs.GetBool("TEngine_BP_ClearCache", false);
             _config.VerifyBuildingResult = EditorPrefs.GetBool("TEngine_BP_VerifyResult", true);
-            _config.BuildinFileCopyOption = (EBuildinFileCopyOption)EditorPrefs.GetInt("TEngine_BP_CopyOption", 0);
+            _config.BuildinFileCopyOption = (EBuildinFileCopyOption)EditorPrefs.GetInt("TEngine_BP_CopyOption", (int)EBuildinFileCopyOption.ClearAndCopyAll);
             _config.FileNameStyle = (EFileNameStyle)EditorPrefs.GetInt("TEngine_BP_FileNameStyle", 1);
 
             _config.BuildHotFixDll = EditorPrefs.GetBool("TEngine_BP_BuildDll", true);
 
+            _config.IsWechatMiniGame = EditorPrefs.GetBool("TEngine_BP_IsWechatMiniGame", false);
+            _config.ExportWechatMiniGame = EditorPrefs.GetBool("TEngine_BP_ExportWechatMiniGame", true);
+            _config.WechatSdkBuildWebGL = EditorPrefs.GetBool("TEngine_BP_WechatSdkBuildWebGL", true);
+
             _config.BuildPlayer = EditorPrefs.GetBool("TEngine_BP_BuildPlayer", false);
 
+            if (_platformIndex == WechatMiniGamePlatformIndex)
+            {
+                _config.IsWechatMiniGame = true;
+                _config.BuildTarget = BuildTarget.WebGL;
+                if (string.IsNullOrWhiteSpace(_config.PlayerOutputPath)
+                    || _config.PlayerOutputPath.EndsWith("/WebGL", StringComparison.OrdinalIgnoreCase)
+                    || _config.PlayerOutputPath.EndsWith("\\WebGL", StringComparison.OrdinalIgnoreCase))
+                {
+                    _config.PlayerOutputPath = BuildConfig.GetDefaultWechatMiniGameOutputPath();
+                }
+                _config.OutputRoot = EditorPrefs.GetString("TEngine_BP_WechatOutputRoot", "./Builds/WebGL");
+            }
+
             _playerPlatformIndex = EditorPrefs.GetInt("TEngine_BP_PlayerPlatform", -1);
-            if (_playerPlatformIndex < 0 || _playerPlatformIndex >= PlatformTargets.Length)
+            if (_playerPlatformIndex < 0 || _playerPlatformIndex >= PlatformNames.Length)
             {
                 _playerPlatformIndex = GetActivePlatformIndex();
             }
@@ -616,6 +745,10 @@ namespace TEngine
         private void SaveSettings()
         {
             EditorPrefs.SetInt("TEngine_BP_BuildTarget", _platformIndex);
+            if (_config.IsWechatMiniGame)
+            {
+                EditorPrefs.SetString("TEngine_BP_WechatOutputRoot", _config.OutputRoot);
+            }
             EditorPrefs.SetInt("TEngine_BP_BuildPipeline", _config.BuildPipeline == EBuildPipeline.BuiltinBuildPipeline ? 1 : 0);
             EditorPrefs.SetInt("TEngine_BP_CompressOption", (int)_config.CompressOption);
             EditorPrefs.SetInt("TEngine_BP_EncryptionType", (int)_config.EncryptionType);
@@ -630,6 +763,9 @@ namespace TEngine
             EditorPrefs.SetInt("TEngine_BP_CopyOption", (int)_config.BuildinFileCopyOption);
             EditorPrefs.SetInt("TEngine_BP_FileNameStyle", (int)_config.FileNameStyle);
             EditorPrefs.SetBool("TEngine_BP_BuildDll", _config.BuildHotFixDll);
+            EditorPrefs.SetBool("TEngine_BP_IsWechatMiniGame", _config.IsWechatMiniGame);
+            EditorPrefs.SetBool("TEngine_BP_ExportWechatMiniGame", _config.ExportWechatMiniGame);
+            EditorPrefs.SetBool("TEngine_BP_WechatSdkBuildWebGL", _config.WechatSdkBuildWebGL);
             EditorPrefs.SetBool("TEngine_BP_BuildPlayer", _config.BuildPlayer);
             EditorPrefs.SetInt("TEngine_BP_PlayerPlatform", _playerPlatformIndex);
             EditorPrefs.SetString("TEngine_BP_PlayerOutput", _config.PlayerOutputPath);
@@ -637,13 +773,65 @@ namespace TEngine
 
         private int GetActivePlatformIndex()
         {
+            if (EditorPrefs.GetBool("TEngine_BP_IsWechatMiniGame", false))
+            {
+                return WechatMiniGamePlatformIndex;
+            }
+
             BuildTarget active = EditorUserBuildSettings.activeBuildTarget;
             for (int i = 0; i < PlatformTargets.Length; i++)
             {
+                if (i == WechatMiniGamePlatformIndex)
+                {
+                    continue;
+                }
+
                 if (PlatformTargets[i] == active)
+                {
                     return i;
+                }
             }
+
             return 0;
+        }
+
+        private bool IsWechatMiniGamePlatform()
+        {
+            return _platformIndex == WechatMiniGamePlatformIndex || _config.IsWechatMiniGame;
+        }
+
+        private void SyncPlatformSelection(int previousPlatformIndex)
+        {
+            if (_platformIndex == WechatMiniGamePlatformIndex)
+            {
+                _config.IsWechatMiniGame = true;
+                _config.BuildTarget = BuildTarget.WebGL;
+                _config.PlayerPlatform = BuildTarget.WebGL;
+                _playerPlatformIndex = WechatMiniGamePlatformIndex;
+                _config.PlayerOutputPath = BuildConfig.GetDefaultWechatMiniGameOutputPath();
+                _config.OutputRoot = EditorPrefs.GetString("TEngine_BP_WechatOutputRoot", "./Builds/WebGL");
+                return;
+            }
+
+            if (previousPlatformIndex == WechatMiniGamePlatformIndex)
+            {
+                _config.IsWechatMiniGame = false;
+            }
+
+            _config.BuildTarget = PlatformTargets[_platformIndex];
+        }
+
+        private void SyncPlayerPlatformSelection()
+        {
+            if (_playerPlatformIndex == WechatMiniGamePlatformIndex)
+            {
+                _config.IsWechatMiniGame = true;
+                _config.PlayerPlatform = BuildTarget.WebGL;
+                _config.PlayerOutputPath = BuildConfig.GetDefaultWechatMiniGameOutputPath();
+                return;
+            }
+
+            _config.PlayerPlatform = PlatformTargets[_playerPlatformIndex];
         }
 
         #endregion
@@ -683,6 +871,9 @@ namespace TEngine
                 BuildinFileCopyOption = source.BuildinFileCopyOption,
                 FileNameStyle = source.FileNameStyle,
                 BuildHotFixDll = source.BuildHotFixDll,
+                IsWechatMiniGame = source.IsWechatMiniGame,
+                ExportWechatMiniGame = source.ExportWechatMiniGame,
+                WechatSdkBuildWebGL = source.WechatSdkBuildWebGL,
                 BuildPlayer = source.BuildPlayer,
                 PlayerPlatform = source.PlayerPlatform,
                 PlayerOutputPath = source.PlayerOutputPath,

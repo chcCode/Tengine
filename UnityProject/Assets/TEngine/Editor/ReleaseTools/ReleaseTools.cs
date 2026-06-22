@@ -109,6 +109,36 @@ namespace TEngine
             BuildWithConfig(config, buildPlayer: true);
         }
 
+        [MenuItem("TEngine/Build/一键打包微信小游戏", false, 30)]
+        public static void AutomationBuildWechatMiniGame()
+        {
+            var config = CreateWechatMiniGameConfig();
+            BuildWithConfig(config, buildPlayer: true);
+        }
+
+        /// <summary>
+        /// 创建微信小游戏默认打包配置。
+        /// </summary>
+        public static BuildConfig CreateWechatMiniGameConfig()
+        {
+            return new BuildConfig
+            {
+                BuildTarget = BuildTarget.WebGL,
+                BuildPipeline = EBuildPipeline.ScriptableBuildPipeline,
+                OutputRoot = Application.dataPath + "/../Builds/WebGL",
+                PackageVersion = BuildConfig.GetDefaultPackageVersion(),
+                BuildHotFixDll = true,
+                MinimalPackage = true,
+                BuildinFileCopyOption = EBuildinFileCopyOption.ClearAndCopyAll,
+                IsWechatMiniGame = true,
+                ExportWechatMiniGame = true,
+                WechatSdkBuildWebGL = true,
+                BuildPlayer = true,
+                PlayerPlatform = BuildTarget.WebGL,
+                PlayerOutputPath = BuildConfig.GetDefaultWechatMiniGameOutputPath(),
+            };
+        }
+
         #endregion
 
         #region 参数化构建入口
@@ -118,6 +148,12 @@ namespace TEngine
         /// </summary>
         public static void BuildWithConfig(BuildConfig config, bool buildPlayer)
         {
+            bool isWechatBuild = config.IsWechatMiniGame;
+            if (isWechatBuild)
+            {
+                PrepareWechatMiniGameBuild(config);
+            }
+
             // 1. [可选] 编译热更DLL
             if (config.BuildHotFixDll)
             {
@@ -150,11 +186,67 @@ namespace TEngine
             // 7. [可选] 构建 Player
             if (buildPlayer || config.BuildPlayer)
             {
+                if (isWechatBuild && config.ExportWechatMiniGame && WechatMiniGameBuildHelper.IsSdkInstalled())
+                {
+                    BuildWechatMiniGamePlayer(config);
+                }
+                else
+                {
+                    BuildImp(
+                        BuildConfig.GetBuildTargetGroup(config.PlayerPlatform),
+                        config.PlayerPlatform,
+                        config.PlayerOutputPath
+                    );
+
+                    if (isWechatBuild && config.ExportWechatMiniGame)
+                    {
+                        Debug.LogWarning(
+                            "[BuildWithConfig] 未安装微信小游戏转换 SDK，已输出 WebGL 包。请安装 SDK 后通过 " +
+                            "「微信小游戏 → 转换小游戏」或 TEngine 打包工具完成转换。");
+                    }
+                }
+            }
+        }
+
+        private static void PrepareWechatMiniGameBuild(BuildConfig config)
+        {
+            config.BuildTarget = BuildTarget.WebGL;
+            config.PlayerPlatform = BuildTarget.WebGL;
+
+            if (string.IsNullOrWhiteSpace(config.PlayerOutputPath)
+                || config.PlayerOutputPath.EndsWith("/WebGL", StringComparison.OrdinalIgnoreCase)
+                || config.PlayerOutputPath.EndsWith("\\WebGL", StringComparison.OrdinalIgnoreCase))
+            {
+                config.PlayerOutputPath = BuildConfig.GetDefaultWechatMiniGameOutputPath();
+            }
+
+            WechatMiniGameBuildHelper.SetDefineSymbol(true);
+            WechatMiniGameBuildHelper.ApplyRecommendedWebGLSettings();
+
+            string validationError = WechatMiniGameBuildHelper.ValidateBuildEnvironment(
+                requireSdkForExport: config.ExportWechatMiniGame);
+            if (!string.IsNullOrEmpty(validationError))
+            {
+                Debug.LogWarning($"[BuildWithConfig] 微信小游戏环境检查：{validationError}");
+            }
+        }
+
+        private static void BuildWechatMiniGamePlayer(BuildConfig config)
+        {
+            Debug.Log("[BuildWithConfig] 使用微信 SDK 导出小游戏...");
+
+            if (!config.WechatSdkBuildWebGL)
+            {
                 BuildImp(
-                    BuildConfig.GetBuildTargetGroup(config.PlayerPlatform),
-                    config.PlayerPlatform,
+                    BuildConfig.GetBuildTargetGroup(BuildTarget.WebGL),
+                    BuildTarget.WebGL,
                     config.PlayerOutputPath
                 );
+            }
+
+            if (!WechatMiniGameBuildHelper.TryExportMiniGame(config.WechatSdkBuildWebGL, out string errorMessage))
+            {
+                Debug.LogError($"[BuildWithConfig] 微信小游戏导出失败: {errorMessage}");
             }
         }
 
@@ -455,6 +547,11 @@ namespace TEngine
                     target = BuildTarget.StandaloneLinux64;
                     break;
                 case "WebGL":
+                    target = BuildTarget.WebGL;
+                    break;
+                case "WeChatMiniGame":
+                case "WechatMiniGame":
+                case "WXMiniGame":
                     target = BuildTarget.WebGL;
                     break;
                 case "Switch":
