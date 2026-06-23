@@ -1,127 +1,97 @@
-# 网络模块 API 速查
+﻿# 网络模块 API 速查
 
-> **适用场景**：HTTP/REST 请求、JSON API、文件下载 | **关联文档**：[modules.md](modules.md)（GameModule 访问）、[hotfix-workflow.md](hotfix-workflow.md)（热更边界）
+> **适用场景**：GameNetty 客户端初始化、登录、Session 消息发送/请求 | **关联文档**：[modules.md](modules.md)（GameModule 访问）、[hotfix-workflow.md](hotfix-workflow.md)（热更边界）
 
 ## 核心 API
 
 ```csharp
-GameModule.Network   // INetworkModule — HTTP 网络模块
+GameModule.Network   // INetworkModule — GameNetty 网络模块
 ```
 
-模块位于 `TEngine.Runtime`（AOT），热更代码通过 `GameModule.Network` 调用。首次访问时 `ModuleSystem` 按 `INetworkModule` → `NetworkModule` 约定自动创建。
+`NetworkModule` 位于 `TEngine.Runtime`，负责初始化 GameNetty ET 运行时并驱动 `FiberManager`。业务登录、协议消息与 NetClient 组件位于热更层 `GameScripts/HotFix/GameLogic/NetClient` 与 `GameProto/Generate/Message`。
 
 ---
 
-## 配置
+## 初始化
 
 ```csharp
-GameModule.Network.BaseUrl = "http://127.0.0.1:8080";
-GameModule.Network.DefaultTimeout = 10f;
-GameModule.Network.AuthToken = "token";  // 自动附加 Authorization: Bearer {token}
-
-GameModule.Network.SetDefaultHeader("X-Platform", "Android");
-GameModule.Network.RemoveDefaultHeader("X-Platform");
-GameModule.Network.ClearDefaultHeaders();
+await GameModule.Network.InitializeAsync();
 ```
+
+推荐在 `GameApp.StartGameLogic()` 中先初始化，再进入 UI/业务流程。
+
+初始化内容：
+
+- 注册 `ET.Logger`、`TimeInfo`、`FiberManager`
+- 扫描 `TEngine.Runtime`、`ET.Core`、`ET.Network`、`GameLogic`、`GameProto` 中的 ET 特性类型
+- 调用 `ET.Entry.Start()` 创建主 Fiber
+- 保存 GameNetty `Root`
 
 ---
 
-## HTTP 请求
+## 登录
 
 ```csharp
-// GET
-NetworkResponse resp = await GameModule.Network.GetAsync("/api/user");
-
-// POST 文本
-NetworkResponse resp = await GameModule.Network.PostAsync("/api/data", jsonBody);
-
-// POST 表单
-NetworkResponse resp = await GameModule.Network.PostFormAsync("/api/login", formFields);
-
-// PUT / DELETE
-NetworkResponse resp = await GameModule.Network.PutAsync("/api/user", body);
-NetworkResponse resp = await GameModule.Network.DeleteAsync("/api/user/1");
-
-// GET JSON
-NetworkResponse<UserInfo> resp = await GameModule.Network.GetJsonAsync<UserInfo>("/api/user");
-
-// POST JSON（请求 + 响应反序列化）
-NetworkResponse<LoginResult> resp = await GameModule.Network
-    .PostJsonAsync<LoginReq, LoginResult>("/api/login", req);
-
-// POST JSON（仅序列化请求体）
-NetworkResponse resp = await GameModule.Network.PostJsonAsync("/api/login", req);
-
-// 下载
-NetworkResponse resp = await GameModule.Network.DownloadBytesAsync("/api/file");
-NetworkResponse resp = await GameModule.Network.DownloadFileAsync("/api/file", savePath);
-
-// 取消全部
-GameModule.Network.CancelAllRequests();
+await ET.LoginHelper.Login(GameModule.Network.Root, account, password);
 ```
 
----
-
-## NetworkResponse
+默认路由配置：
 
 ```csharp
-response.IsSuccess    // 是否成功
-response.StatusCode   // HTTP 状态码
-response.Text         // 响应文本
-response.Data         // 响应二进制
-response.Error        // 错误信息
-response.IsCanceled   // 是否取消
-response.IsTimeout    // 是否超时
-response.Url          // 实际请求 URL
-
-// 泛型版本
-NetworkResponse<T>.Result  // JSON 反序列化结果
-response.ToJsonResponse<T>()  // 手动反序列化
+ET.ConstValue.RouterHttpHost = "127.0.0.1";
+ET.ConstValue.RouterHttpPort = 30300;
 ```
+
+登录成功后，Gate `Session` 会保存到 `SessionComponent`，可通过 `GameModule.Network.Session` 获取。
 
 ---
 
-## NetworkRequestOptions
+## 发送与请求
 
 ```csharp
-var options = new NetworkRequestOptions
-{
-    Timeout = 30f,
-    ContentType = "application/json; charset=utf-8",
-    SkipDefaultContentType = false,
-    Headers = new Dictionary<string, string> { { "X-Id", "1" } }
-};
+// Send
+C2G_Ping ping = C2G_Ping.Create();
+GameModule.Network.Send(ping);
 
-await GameModule.Network.GetAsync("/api/data", options, cancellationToken);
+// Call
+C2G_Ping request = C2G_Ping.Create();
+G2C_Ping response = await GameModule.Network.CallAsync<G2C_Ping>(request);
+```
+
+断开：
+
+```csharp
+GameModule.Network.Disconnect();
 ```
 
 ---
 
-## URL 规则
+## 当前导入内容
 
-- 以 `http://` 或 `https://` 开头 → 直接使用
-- 否则拼接 `BaseUrl + url`（`BaseUrl` 为空时抛异常）
-- 推荐业务层封装 URL，UI 不直接拼路径
+```text
+Assets/ET/                                      # ET Core / Network / ThirdParty
+Assets/UnityWebSocket/                          # WebGL WebSocket 支持
+Assets/GameScripts/HotFix/GameProto/Generate/   # 示例协议消息
+Assets/GameScripts/HotFix/GameLogic/NetClient/  # 登录、路由、心跳、发送器
+```
 
----
+依赖包：
 
-## JSON 限制
-
-- 使用 `Utility.Json`（默认 `JsonUtility`）
-- DTO 需 `[Serializable]` + public **field**（不支持 property）
-- 复杂 JSON 需替换 `RootModule.jsonHelperTypeName`
+```json
+"com.cysharp.memorypack": "https://gitee.com/game-for-all_0/MemoryPack.git?path=src/MemoryPack.Unity/Assets/Plugins/MemoryPack"
+```
 
 ---
 
 ## 常见错误
 
-| 错误写法 | 正确写法 | 原因 |
-|---------|---------|------|
-| `ModuleSystem.GetModule<INetworkModule>()` | `GameModule.Network` | 统一模块访问 |
-| `Utility.Http.Get`（Coroutine） | `await GameModule.Network.GetAsync` | 异步优先，统一响应 |
-| JSON 类用 property | 用 field + `[Serializable]` | JsonUtility 限制 |
-| UI 销毁后不取消请求 | 传 `CancellationToken`，OnDestroy 取消 | 避免空引用 |
-| 相对路径无 BaseUrl | 设置 BaseUrl 或用完整 URL | URL 拼接依赖 BaseUrl |
+| 错误 | 修复 |
+|------|------|
+| 未初始化就 Send/Call | 先 `await GameModule.Network.InitializeAsync()` |
+| `Session` 为空 | 先 `ET.LoginHelper.Login(GameModule.Network.Root, account, password)` |
+| 找不到 `MemoryPack` | 让 Unity 重新解析 `Packages/manifest.json` |
+| 协议反序列化失败 | 同步前后端 opcode 与 MemoryPack 字段顺序 |
+| WebGL 连接失败 | 确保服务端提供 WebSocket 入口 |
 
 ---
 
@@ -130,6 +100,6 @@ await GameModule.Network.GetAsync("/api/data", options, cancellationToken);
 | 关联主题 | 文档 |
 |---------|------|
 | 模块访问 | modules.md |
-| 事件通知 UI | event-system.md |
 | 热更边界 | hotfix-workflow.md |
 | 用户文档 | Books/3-8-网络模块.md |
+| GameNetty | https://github.com/Alex-Rachel/GameNetty/tree/main |

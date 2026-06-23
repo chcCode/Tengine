@@ -1,0 +1,19 @@
+{
+    "name": "ET.Network",
+    "rootNamespace": "ET.Network",
+    "references": [
+        "MemoryPack",
+        "GUID:47f9fc774596be54ebfed7739cd70c86",
+        "GUID:1aa3e8589868c80499255710874679c0",
+        "GUID:8b65d8710c3b04373a41cbf6b777ee65"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

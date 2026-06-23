@@ -17,6 +17,13 @@ using TEngine;
 #endif
 public partial class GameApp
 {
+    /// <summary>
+    /// 是否启用 GameNetty 网络模块。
+    /// 本地只调 UI 或未启动服务端时保持 false，避免网络初始化影响界面进入；
+    /// 需要联调 Server 时改为 true。
+    /// </summary>
+    private static bool _enableNetwork = false;
+
     private static List<Assembly> _hotfixAssembly;
 
     /// <summary>
@@ -34,11 +41,22 @@ public partial class GameApp
         StartGameLogic();
     }
     
-    private static void StartGameLogic()
+    private static async void StartGameLogic()
     {
         LogLubanItemExample();
-        GameModule.UI.ShowUIAsync<BattleMainUI>();
+        // GameModule.UI.ShowUIAsync<BattleMainUI>();
         GameModule.UI.ShowUIAsync<LoginUI>();
+        // GameModule.UI.ShowUIAsync<TestUI>();
+
+        // 网络初始化放在 UI 显示之后，避免服务端未启动或网络模块异常时阻塞登录界面。
+        if (_enableNetwork)
+        {
+            await GameModule.Network.InitializeAsync();
+        }
+        else
+        {
+            Log.Info("GameNetty 网络模块未启用，如需联调服务端请将 _enableNetwork 改为 true。");
+        }
     }
 
     private static void LogLubanItemExample()
@@ -59,6 +77,11 @@ public partial class GameApp
     
     private static void Release()
     {
+        if (_enableNetwork)
+        {
+            GameModule.Network.Disconnect();
+        }
+
         SingletonSystem.Release();
         Log.Warning("======= Release GameApp =======");
     }

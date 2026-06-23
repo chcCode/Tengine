@@ -17,7 +17,7 @@ GameModule.UI            // UIModule            — UI 管理
 GameModule.Scene         // ISceneModule        — 场景
 GameModule.Timer         // ITimerModule        — 计时器
 GameModule.Localization  // ILocalizationModule — 本地化
-GameModule.Network       // INetworkModule        — HTTP 网络
+GameModule.Network       // INetworkModule        — GameNetty 网络
 
 GameModule.Shutdown()   // 清空所有模块缓存引用，仅在游戏退出时调用
 ```
@@ -127,19 +127,18 @@ MemoryPool.Release(info);  // Release 后禁止再访问，禁止 Release 两次
 ### NetworkModule 网络
 
 ```csharp
-// 配置
-GameModule.Network.BaseUrl = "http://127.0.0.1:8080";
-GameModule.Network.AuthToken = "token";
+// 初始化 GameNetty 运行时
+await GameModule.Network.InitializeAsync();
 
-// GET / POST JSON
-NetworkResponse resp = await GameModule.Network.GetAsync("/api/user");
-NetworkResponse<LoginResult> login = await GameModule.Network
-    .PostJsonAsync<LoginReq, LoginResult>("/api/login", req);
+// 登录（热更层 NetClient）
+await ET.LoginHelper.Login(GameModule.Network.Root, account, password);
 
-if (resp.IsSuccess) { Log.Info(resp.Text); }
+// 请求/响应
+C2G_Ping request = C2G_Ping.Create();
+G2C_Ping response = await GameModule.Network.CallAsync<G2C_Ping>(request);
 
-// 取消
-GameModule.Network.CancelAllRequests();
+// 断开
+GameModule.Network.Disconnect();
 ```
 
 > 完整 API 见 [network-module.md](network-module.md)。
