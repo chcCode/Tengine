@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks;
+using System;
 
 namespace ET
 {
@@ -46,6 +47,21 @@ namespace ET
             main2NetClientLogin.Account = account;
             main2NetClientLogin.Password = password;
             NetClient2Main_Login response = await self.Root().GetComponent<ProcessInnerSender>().Call(self.netClientActorId, main2NetClientLogin) as NetClient2Main_Login;
+            if (response == null)
+            {
+                throw new Exception("Login failed: response is null.");
+            }
+
+            if (response.Error != ErrorCode.ERR_Success)
+            {
+                throw new RpcException(response.Error, $"Login failed: {response.Message}");
+            }
+
+            if (response.PlayerId <= 0)
+            {
+                throw new Exception($"Login failed: invalid PlayerId {response.PlayerId}.");
+            }
+
             return response.PlayerId;
         }
 

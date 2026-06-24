@@ -51,9 +51,16 @@ public partial class GameApp
         // 网络初始化放在 UI 显示之后，避免服务端未启动或网络模块异常时阻塞登录界面。
         if (_enableNetwork)
         {
-            await GameModule.Network.InitializeAsync();
-            long playerId = await ET.LoginHelper.Login(GameModule.Network.Root, "test", "123456");
-            Log.Info("GameNetty 登录成功，PlayerId={0}", playerId);
+            try
+            {
+                await GameModule.Network.InitializeAsync();
+                long playerId = await ET.LoginHelper.Login(GameModule.Network.Root, "test", "123456");
+                Log.Info("GameNetty 登录成功，PlayerId={0}", playerId);
+            }
+            catch (System.Exception exception)
+            {
+                Log.Error("GameNetty 登录失败：{0}", exception.Message);
+            }
         }
         else
         {
