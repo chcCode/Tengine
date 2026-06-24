@@ -2,7 +2,7 @@ namespace ET
 {
     public static class LoginHelper
     {
-        public static async ETTask Login(Scene root, string account, string password)
+        public static async ETTask<long> Login(Scene root, string account, string password)
         {
             root.RemoveComponent<ClientSenderComponent>();
             
@@ -15,7 +15,7 @@ namespace ET
             // root.GetComponent<PlayerComponent>().MyId = playerId;
             //
             // await EventSystem.Instance.PublishAsync(root, new LoginFinish());
-            await ETTask.CompletedTask;
+            return playerId;
         }
     }
 }

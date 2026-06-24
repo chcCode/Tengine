@@ -22,7 +22,7 @@ public partial class GameApp
     /// 本地只调 UI 或未启动服务端时保持 false，避免网络初始化影响界面进入；
     /// 需要联调 Server 时改为 true。
     /// </summary>
-    private static bool _enableNetwork = false;
+    private static bool _enableNetwork = true;
 
     private static List<Assembly> _hotfixAssembly;
 
@@ -52,6 +52,8 @@ public partial class GameApp
         if (_enableNetwork)
         {
             await GameModule.Network.InitializeAsync();
+            long playerId = await ET.LoginHelper.Login(GameModule.Network.Root, "test", "123456");
+            Log.Info("GameNetty 登录成功，PlayerId={0}", playerId);
         }
         else
         {
