@@ -59,7 +59,7 @@ public partial class GameApp
             }
             catch (System.Exception exception)
             {
-                Log.Error("GameNetty 登录失败：{0}", exception.Message);
+                Log.Error("GameNetty 登录失败：{0}", exception);
             }
         }
         else

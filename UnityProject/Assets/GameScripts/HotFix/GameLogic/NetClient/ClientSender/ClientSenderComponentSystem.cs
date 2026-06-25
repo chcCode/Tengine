@@ -39,8 +39,13 @@ namespace ET
 
         public static async ETTask<long> LoginAsync(this ClientSenderComponent self, string account, string password)
         {
-            self.fiberId = await FiberManager.Instance.Create(SchedulerType.ThreadPool, 0, SceneType.NetClient, "");
+            // Unity 客户端侧放在主线程调度，避免 ThreadPool Fiber 与主线程消息队列初始化时序不一致。
+            self.fiberId = await FiberManager.Instance.Create(SchedulerType.Main, 0, SceneType.NetClient, "");
             self.netClientActorId = new ActorId(self.Fiber().Process, self.fiberId);
+            Log.Info($"NetClient fiber created, actorId: {self.netClientActorId}");
+            
+            // MainThreadScheduler 会在 LateUpdate 末尾把新 Fiber 加入调度队列，等一帧再向 NetClient 投递消息。
+            await self.Root().GetComponent<TimerComponent>().WaitFrameAsync();
 
             Main2NetClient_Login main2NetClientLogin = Main2NetClient_Login.Create();
             main2NetClientLogin.OwnerFiberId = self.Fiber().Id;
@@ -49,17 +54,18 @@ namespace ET
             NetClient2Main_Login response = await self.Root().GetComponent<ProcessInnerSender>().Call(self.netClientActorId, main2NetClientLogin) as NetClient2Main_Login;
             if (response == null)
             {
-                throw new Exception("Login failed: response is null.");
+                throw new Exception("Login failed: NetClient2Main_Login response is null.");
             }
 
             if (response.Error != ErrorCode.ERR_Success)
             {
-                throw new RpcException(response.Error, $"Login failed: {response.Message}");
+                string message = string.IsNullOrEmpty(response.Message) ? "empty response message" : response.Message;
+                throw new RpcException(response.Error, $"Login failed: error={response.Error}, message={message}");
             }
 
             if (response.PlayerId <= 0)
             {
-                throw new Exception($"Login failed: invalid PlayerId {response.PlayerId}.");
+                throw new Exception($"Login failed: invalid PlayerId {response.PlayerId}, error={response.Error}, message={response.Message}.");
             }
 
             return response.PlayerId;
